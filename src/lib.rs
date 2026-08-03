@@ -99,14 +99,23 @@ bitflags! {
     pub struct AccessMask: u32 {
         const CREATE_CHILD    = 0x0000_0001;
         const DELETE_CHILD    = 0x0000_0002;
+        const LIST_CHILDREN   = 0x0000_0004;
         const SELF            = 0x0000_0008; // validated write
+        const READ_PROP       = 0x0000_0010; // read property (scoped by object GUID)
         const WRITE_PROP      = 0x0000_0020; // write property (scoped by object GUID)
+        const DELETE_TREE     = 0x0000_0040;
+        const LIST_OBJECT     = 0x0000_0080;
         const CONTROL_ACCESS  = 0x0000_0100; // extended right (scoped by object GUID)
         const DELETE          = 0x0001_0000;
+        const READ_CONTROL    = 0x0002_0000;
         const WRITE_DAC       = 0x0004_0000;
         const WRITE_OWNER     = 0x0008_0000;
+        const SYNCHRONIZE     = 0x0010_0000;
+        const ACCESS_SYSTEM_SECURITY = 0x0100_0000;
         const GENERIC_ALL     = 0x1000_0000;
+        const GENERIC_EXECUTE = 0x2000_0000;
         const GENERIC_WRITE   = 0x4000_0000;
+        const GENERIC_READ    = 0x8000_0000;
     }
 }
 
@@ -187,7 +196,9 @@ pub fn parse(b: &[u8]) -> Result<SecurityDescriptor> {
 
     let owner = (owner_off != 0).then(|| sid_at(b, owner_off)).transpose()?;
     let group = (group_off != 0).then(|| sid_at(b, group_off)).transpose()?;
-    let dacl = (dacl_off != 0).then(|| parse_acl(b, dacl_off)).transpose()?;
+    let dacl = (dacl_off != 0)
+        .then(|| parse_acl(b, dacl_off))
+        .transpose()?;
 
     Ok(SecurityDescriptor { owner, group, dacl })
 }

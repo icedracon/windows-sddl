@@ -12,9 +12,9 @@ fn main() {
             .step_by(2)
             .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("hex"))
             .collect::<Vec<u8>>(),
-        None => windows_sddl::build_rbcd_sd(
-            &windows_sddl::Sid::parse("S-1-5-21-1-2-3-1104").unwrap(),
-        ),
+        None => {
+            windows_sddl::build_rbcd_sd(&windows_sddl::Sid::parse("S-1-5-21-1-2-3-1104").unwrap())
+        }
     };
 
     let sd = parse(&bytes).expect("parse security descriptor");

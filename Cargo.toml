@@ -1,6 +1,6 @@
 [package]
 name = "windows-sddl"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.74"
 description = "Pure-Rust, no-FFI parser and builder for Windows self-relative SECURITY_DESCRIPTOR / DACL / ACE blobs (MS-DTYP), plus SID/GUID types and AD extended-right GUIDs."
