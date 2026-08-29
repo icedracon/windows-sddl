@@ -10,6 +10,7 @@ documentation = "https://docs.rs/windows-sddl"
 readme = "README.md"
 keywords = ["windows", "sddl", "acl", "security", "active-directory"]
 categories = ["parser-implementations", "os::windows-apis"]
+exclude = ["/fuzz"]
 
 [dependencies]
 bitflags = "2"

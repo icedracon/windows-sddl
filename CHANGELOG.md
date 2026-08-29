@@ -11,6 +11,8 @@ project adheres to [SemVer](https://semver.org/spec/v2.0.0.html).
 
 - Linked the offline dangerous-ACE audit example into the shared research
   workflow index and AI-readable documentation.
+- Added a libFuzzer target for hostile security-descriptor input, scheduled
+  fuzzing, RustSec advisory auditing, and weekly dependency monitoring.
 
 ## [0.1.2] — 2026-08-29
 
