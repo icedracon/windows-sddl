@@ -53,6 +53,11 @@ Or from the CLI:
 cargo run --example parse_sd -- 010004801400...   # a hex nTSecurityDescriptor
 ```
 
+The example highlights dangerous allow ACEs relevant to Active Directory and
+offline DFIR. Its inputs, boundaries, and companion workflows are documented
+in the ecosystem's
+[`RESEARCH-WORKFLOWS.md`](https://github.com/icedracon/win32-min/blob/master/RESEARCH-WORKFLOWS.md).
+
 ## Scope
 
 Parsing + building of self-relative security descriptors, ACLs, ACEs, SIDs, and GUIDs, plus the

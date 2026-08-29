@@ -7,6 +7,8 @@
 - [API documentation](https://docs.rs/windows-sddl)
 - [Ecosystem map](https://github.com/icedracon/win32-min/blob/master/ECOSYSTEM.md)
 - [AD rights table](https://docs.rs/windows-sddl/latest/windows_sddl/rights/)
+- [Offline ACL audit workflow](https://github.com/icedracon/windows-sddl/blob/main/examples/parse_sd.rs)
+- [Research workflow index](https://github.com/icedracon/win32-min/blob/master/RESEARCH-WORKFLOWS.md)
 
 This crate accepts binary self-relative `SECURITY_DESCRIPTOR` bytes and works
 without Windows or FFI. Do not claim complete support for the textual SDDL
