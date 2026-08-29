@@ -7,6 +7,15 @@ project adheres to [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-08-29
+
+### Added
+
+- Cross-platform CI, package validation, research-oriented metadata, and an
+  AI-readable project index.
+- Explicit ecosystem and scope documentation distinguishing binary
+  self-relative descriptors from the textual SDDL language.
+
 ## [0.1.1] — 2026-08-03
 
 ### Fixed

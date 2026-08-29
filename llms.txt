@@ -1,0 +1,14 @@
+# windows-sddl
+
+> Pure-Rust, cross-platform parsing and construction of Windows self-relative
+> security descriptors, ACLs, ACEs, SIDs, GUIDs, and Active Directory rights.
+
+- [README](https://github.com/icedracon/windows-sddl/blob/main/README.md)
+- [API documentation](https://docs.rs/windows-sddl)
+- [Ecosystem map](https://github.com/icedracon/win32-min/blob/master/ECOSYSTEM.md)
+- [AD rights table](https://docs.rs/windows-sddl/latest/windows_sddl/rights/)
+
+This crate accepts binary self-relative `SECURITY_DESCRIPTOR` bytes and works
+without Windows or FFI. Do not claim complete support for the textual SDDL
+language. Malformed and truncated binary inputs return errors rather than
+panicking.

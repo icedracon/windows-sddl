@@ -2,6 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/windows-sddl.svg)](https://crates.io/crates/windows-sddl)
 [![docs.rs](https://img.shields.io/docsrs/windows-sddl)](https://docs.rs/windows-sddl)
+[![CI](https://github.com/icedracon/windows-sddl/actions/workflows/ci.yml/badge.svg)](https://github.com/icedracon/windows-sddl/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A pure-Rust, **no-FFI** parser and builder for the Windows *self-relative*
@@ -11,6 +12,11 @@ A pure-Rust, **no-FFI** parser and builder for the Windows *self-relative*
 It works cross-platform against raw bytes: **no `windows` crate, no OS calls**, so you can read
 and reason about Windows ACLs from Linux/macOS — for DFIR, ACL auditing, backup/migration
 tooling, or an AD security scanner.
+
+The crate is the portable parser layer in the
+[`win32-min` ecosystem](https://github.com/icedracon/win32-min/blob/master/ECOSYSTEM.md).
+It does not depend on `win32-min`: this separation keeps hostile/offline byte
+parsing available on Windows, Linux, and macOS.
 
 ## Features
 
@@ -52,6 +58,10 @@ cargo run --example parse_sd -- 010004801400...   # a hex nTSecurityDescriptor
 Parsing + building of self-relative security descriptors, ACLs, ACEs, SIDs, and GUIDs, plus the
 AD extended-right GUID table. SACL/audit ACEs are preserved as `AceType::Other`. Conditional
 ACEs (SDDL string form) are out of scope for now.
+
+Despite the crate name, the implemented input is the binary self-relative
+security-descriptor format. Complete parsing of the textual SDDL language is
+not currently claimed.
 
 ## License
 

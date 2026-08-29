@@ -1,14 +1,14 @@
 [package]
 name = "windows-sddl"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 rust-version = "1.74"
-description = "Pure-Rust, no-FFI parser and builder for Windows self-relative SECURITY_DESCRIPTOR / DACL / ACE blobs (MS-DTYP), plus SID/GUID types and AD extended-right GUIDs."
+description = "Pure-Rust parser for Windows security descriptors, ACLs, ACEs, SIDs, and AD rights for DFIR and security research."
 license = "MIT"
 repository = "https://github.com/icedracon/windows-sddl"
 documentation = "https://docs.rs/windows-sddl"
 readme = "README.md"
-keywords = ["windows", "security-descriptor", "sddl", "acl", "sid"]
+keywords = ["windows", "sddl", "acl", "security", "active-directory"]
 categories = ["parser-implementations", "os::windows-apis"]
 
 [dependencies]
