@@ -22,7 +22,7 @@ jobs:
   parse-hostile-input:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz --locked --version 0.13.2
       - run: cargo +nightly fuzz run parse -- -max_total_time=60
