@@ -7,8 +7,20 @@ project adheres to [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-09-01
+
+### Security
+
+- Reject non-self-relative descriptors, truncated or escaping ACL/ACE/SID
+  ranges, impossible ACE counts, and zero/undersized ACE records instead of
+  accepting ambiguous hostile input.
+- Preserve the security-critical distinction between an absent DACL, a NULL
+  DACL, and a present ACL through the new `DaclKind` field.
+
 ### Added
 
+- Retain the descriptor control flags on `SecurityDescriptor` so downstream
+  authorization tools can reason about `SE_DACL_PRESENT` and related state.
 - Linked the offline dangerous-ACE audit example into the shared research
   workflow index and AI-readable documentation.
 - Added a libFuzzer target for hostile security-descriptor input, scheduled

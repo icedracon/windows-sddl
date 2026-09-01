@@ -21,13 +21,15 @@ parsing available on Windows, Linux, and macOS.
 ## Features
 
 - Parse self-relative `SECURITY_DESCRIPTOR` → owner / group / DACL with typed ACEs
-  (`AccessAllowed`, `AccessDenied`, and their *object* variants).
+  (`AccessAllowed`, `AccessDenied`, and their *object* variants), preserving
+  whether the DACL is absent, NULL, or present through `DaclKind`.
 - Typed `AccessMask` bitflags (`WriteDacl`, `WriteOwner`, `GenericAll`, extended-right bits …).
 - `Sid` and `Guid` types with binary + string parsing/formatting (`objectSid`, `S-1-5-…`).
 - A table of Active-Directory extended-right GUIDs ([`rights`]) so an object ACE resolves into a
   concrete right: DCSync, Shadow Credentials, RBCD, cert enrollment, force-change-password, …
 - Build helper (`build_rbcd_sd`) for emitting a self-relative SD with an allow ACE.
 - **Never panics on malformed input** — hostile/truncated blobs return an error. Fuzz-tested.
+- Rejects child ACL, ACE, GUID, and SID ranges that escape their declared parent container.
 
 ## Example
 

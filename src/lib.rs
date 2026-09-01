@@ -89,6 +89,8 @@ pub enum SddlError {
     Truncated(&'static str),
     #[error("bad ACE sid")]
     BadSid,
+    #[error("malformed security descriptor: {0}")]
+    Malformed(&'static str),
 }
 
 type Result<T> = std::result::Result<T, SddlError>;
@@ -157,10 +159,27 @@ pub struct Acl {
 
 #[derive(Clone, Debug, Default)]
 pub struct SecurityDescriptor {
+    /// Raw SECURITY_DESCRIPTOR control word (MS-DTYP 2.4.6).
+    pub control: u16,
     pub owner: Option<Sid>,
     pub group: Option<Sid>,
+    /// Distinguishes an omitted DACL from a present NULL DACL and a concrete ACL.
+    pub dacl_kind: DaclKind,
     pub dacl: Option<Acl>,
 }
+
+/// Semantic state of the DACL. A NULL DACL grants unrestricted access and must not be
+/// treated like an empty concrete ACL.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DaclKind {
+    #[default]
+    NotPresent,
+    Null,
+    Present,
+}
+
+const SE_DACL_PRESENT: u16 = 0x0004;
+const SE_SELF_RELATIVE: u16 = 0x8000;
 
 fn u16le(b: &[u8], o: usize) -> Result<u16> {
     Ok(u16::from_le_bytes(
@@ -190,28 +209,82 @@ pub fn parse(b: &[u8]) -> Result<SecurityDescriptor> {
     if b.len() < 20 {
         return Err(SddlError::Truncated("sd header"));
     }
+    let control = u16le(b, 2)?;
+    if control & SE_SELF_RELATIVE == 0 {
+        return Err(SddlError::Malformed("SE_SELF_RELATIVE is not set"));
+    }
     let owner_off = u32le(b, 4)? as usize;
     let group_off = u32le(b, 8)? as usize;
     let dacl_off = u32le(b, 16)? as usize;
 
     let owner = (owner_off != 0).then(|| sid_at(b, owner_off)).transpose()?;
     let group = (group_off != 0).then(|| sid_at(b, group_off)).transpose()?;
-    let dacl = (dacl_off != 0)
-        .then(|| parse_acl(b, dacl_off))
-        .transpose()?;
+    let (dacl_kind, dacl) = match (control & SE_DACL_PRESENT != 0, dacl_off) {
+        (false, 0) => (DaclKind::NotPresent, None),
+        (false, _) => {
+            return Err(SddlError::Malformed(
+                "DACL offset is non-zero while SE_DACL_PRESENT is clear",
+            ))
+        }
+        (true, 0) => (DaclKind::Null, None),
+        (true, _) => (DaclKind::Present, Some(parse_acl(b, dacl_off)?)),
+    };
 
-    Ok(SecurityDescriptor { owner, group, dacl })
+    Ok(SecurityDescriptor {
+        control,
+        owner,
+        group,
+        dacl_kind,
+        dacl,
+    })
 }
 
 fn parse_acl(b: &[u8], off: usize) -> Result<Acl> {
     // ACL header: Revision(1) Sbz1(1) AclSize(2) AceCount(2) Sbz2(2)
+    let acl_size = u16le(
+        b,
+        off.checked_add(2)
+            .ok_or(SddlError::Malformed("ACL offset overflow"))?,
+    )? as usize;
+    if acl_size < 8 {
+        return Err(SddlError::Malformed(
+            "AclSize is smaller than the ACL header",
+        ));
+    }
+    let acl_end = off
+        .checked_add(acl_size)
+        .ok_or(SddlError::Malformed("AclSize overflow"))?;
+    if acl_end > b.len() {
+        return Err(SddlError::Truncated("acl"));
+    }
     let ace_count = u16le(b, off + 4)? as usize;
+    if ace_count > (acl_size - 8) / 4 {
+        return Err(SddlError::Malformed("AceCount cannot fit in AclSize"));
+    }
     let mut cur = off + 8;
     let mut aces = Vec::with_capacity(ace_count);
     for _ in 0..ace_count {
-        let ace_type_byte = *b.get(cur).ok_or(SddlError::Truncated("ace type"))?;
-        let flags = *b.get(cur + 1).ok_or(SddlError::Truncated("ace flags"))?;
+        let header_end = cur
+            .checked_add(4)
+            .ok_or(SddlError::Malformed("ACE header overflow"))?;
+        if header_end > acl_end {
+            return Err(SddlError::Truncated("ace header"));
+        }
         let size = u16le(b, cur + 2)? as usize;
+        if size < 8 {
+            return Err(SddlError::Malformed(
+                "AceSize is smaller than the ACE header and mask",
+            ));
+        }
+        let ace_end = cur
+            .checked_add(size)
+            .ok_or(SddlError::Malformed("AceSize overflow"))?;
+        if ace_end > acl_end {
+            return Err(SddlError::Malformed("ACE escapes AclSize"));
+        }
+        let ace = &b[cur..ace_end];
+        let ace_type_byte = ace[0];
+        let flags = ace[1];
         let ace_type = match ace_type_byte {
             0x00 => AceType::AccessAllowed,
             0x01 => AceType::AccessDenied,
@@ -219,29 +292,40 @@ fn parse_acl(b: &[u8], off: usize) -> Result<Acl> {
             0x06 => AceType::AccessDeniedObject,
             x => AceType::Other(x),
         };
-        let mask = AccessMask::from_bits_truncate(u32le(b, cur + 4)?);
+        let mask = AccessMask::from_bits_truncate(u32le(ace, 4)?);
 
         let (object_type, inherited_object_type, sid_off) = match ace_type {
             AceType::AccessAllowedObject | AceType::AccessDeniedObject => {
                 // Mask(4) Flags(4) [ObjectType 16] [InheritedObjectType 16] Sid
-                let obj_flags = u32le(b, cur + 8)?;
-                let mut p = cur + 12;
+                if size < 12 {
+                    return Err(SddlError::Malformed(
+                        "object ACE is smaller than its fixed fields",
+                    ));
+                }
+                let obj_flags = u32le(ace, 8)?;
+                let mut p = 12;
                 let mut ot = None;
                 let mut iot = None;
                 if obj_flags & 0x1 != 0 {
-                    ot = b.get(p..p + 16).and_then(Guid::from_bytes);
+                    ot = ace.get(p..p + 16).and_then(Guid::from_bytes);
+                    if ot.is_none() {
+                        return Err(SddlError::Truncated("object ACE ObjectType GUID"));
+                    }
                     p += 16;
                 }
                 if obj_flags & 0x2 != 0 {
-                    iot = b.get(p..p + 16).and_then(Guid::from_bytes);
+                    iot = ace.get(p..p + 16).and_then(Guid::from_bytes);
+                    if iot.is_none() {
+                        return Err(SddlError::Truncated("object ACE InheritedObjectType GUID"));
+                    }
                     p += 16;
                 }
                 (ot, iot, p)
             }
-            _ => (None, None, cur + 8),
+            _ => (None, None, 8),
         };
 
-        let trustee = sid_at(b, sid_off)?;
+        let trustee = sid_at(ace, sid_off)?;
         aces.push(Ace {
             ace_type,
             flags,
@@ -250,10 +334,12 @@ fn parse_acl(b: &[u8], off: usize) -> Result<Acl> {
             object_type,
             inherited_object_type,
         });
-        if size == 0 {
-            break;
-        }
-        cur += size;
+        cur = ace_end;
+    }
+    if cur != acl_end {
+        return Err(SddlError::Malformed(
+            "AclSize contains bytes not described by AceCount",
+        ));
     }
     Ok(Acl { aces })
 }
@@ -277,7 +363,7 @@ mod tests {
     /// A truncated object-ACE (ObjectType flag set, no GUID bytes) must not panic.
     #[test]
     fn truncated_object_ace_does_not_panic() {
-        let mut sd = vec![1, 0, 0, 0];
+        let mut sd = vec![1, 0, 0x04, 0x80];
         sd.extend_from_slice(&0u32.to_le_bytes()); // owner off
         sd.extend_from_slice(&0u32.to_le_bytes()); // group off
         sd.extend_from_slice(&0u32.to_le_bytes()); // sacl off
@@ -289,10 +375,45 @@ mod tests {
         let _ = parse(&sd); // must not panic
     }
 
+    #[test]
+    fn null_dacl_is_distinct_from_absent_dacl() {
+        let mut null_sd = vec![1, 0];
+        null_sd.extend_from_slice(&0x8004u16.to_le_bytes());
+        null_sd.extend_from_slice(&[0u8; 16]);
+        let parsed = parse(&null_sd).expect("NULL DACL descriptor");
+        assert_eq!(parsed.dacl_kind, DaclKind::Null);
+        assert!(parsed.dacl.is_none());
+
+        let mut absent_sd = vec![1, 0];
+        absent_sd.extend_from_slice(&0x8000u16.to_le_bytes());
+        absent_sd.extend_from_slice(&[0u8; 16]);
+        let parsed = parse(&absent_sd).expect("absent DACL descriptor");
+        assert_eq!(parsed.dacl_kind, DaclKind::NotPresent);
+        assert!(parsed.dacl.is_none());
+    }
+
+    #[test]
+    fn rejects_ace_that_escapes_declared_acl() {
+        let sid = Sid::parse("S-1-5-21-1-2-3-1104").unwrap();
+        let mut sd = build_rbcd_sd(&sid);
+        let dacl_off = u32::from_le_bytes(sd[16..20].try_into().unwrap()) as usize;
+        sd[dacl_off + 2..dacl_off + 4].copy_from_slice(&8u16.to_le_bytes());
+        assert!(parse(&sd).is_err());
+    }
+
+    #[test]
+    fn rejects_zero_sized_ace_instead_of_returning_partial_acl() {
+        let sid = Sid::parse("S-1-5-21-1-2-3-1104").unwrap();
+        let mut sd = build_rbcd_sd(&sid);
+        let dacl_off = u32::from_le_bytes(sd[16..20].try_into().unwrap()) as usize;
+        sd[dacl_off + 10..dacl_off + 12].copy_from_slice(&0u16.to_le_bytes());
+        assert!(parse(&sd).is_err());
+    }
+
     /// Fuzz-lite: random + seed-mutated bytes must never panic (deterministic seed).
     #[test]
     fn fuzz_parse_never_panics() {
-        let mut seed = vec![1, 0, 0, 0];
+        let mut seed = vec![1, 0, 0x04, 0x80];
         seed.extend_from_slice(&0u32.to_le_bytes());
         seed.extend_from_slice(&0u32.to_le_bytes());
         seed.extend_from_slice(&0u32.to_le_bytes());

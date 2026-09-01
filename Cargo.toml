@@ -1,6 +1,6 @@
 [package]
 name = "windows-sddl"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 rust-version = "1.74"
 description = "Pure-Rust parser for Windows security descriptors, ACLs, ACEs, SIDs, and AD rights for DFIR and security research."
@@ -10,7 +10,7 @@ documentation = "https://docs.rs/windows-sddl"
 readme = "README.md"
 keywords = ["windows", "sddl", "acl", "security", "active-directory"]
 categories = ["parser-implementations", "os::windows-apis"]
-exclude = ["/fuzz"]
+include = ["/src/**", "/examples/**", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
 [dependencies]
 bitflags = "2"
