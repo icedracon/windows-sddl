@@ -7,6 +7,23 @@ project adheres to [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-09-06
+
+### Documentation
+
+- Correct the Scope section: the SACL is not parsed today
+  (`SecurityDescriptor` carries owner + group + DACL only, and a present
+  SACL is skipped, not preserved). `AceType::Other` is correctly scoped
+  to non-standard ACE types found inside the DACL.
+- Rewrite the README DCSync example. Previously it printed "can DCSync"
+  on a single `is_dcsync_right` match; DCSync in fact requires **both**
+  `REPL_GET_CHANGES` and `REPL_GET_CHANGES_ALL` on the same trustee, on
+  the domain head. New example accumulates per trustee and only concludes
+  DCSync-capable when both bits are set. `is_dcsync_right`'s own docstring
+  already documented this — the example was the overclaim.
+
+No code changes.
+
 ## [0.1.3] — 2026-09-01
 
 ### Security
