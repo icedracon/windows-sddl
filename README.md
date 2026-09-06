@@ -37,14 +37,24 @@ parsing available on Windows, Linux, and macOS.
 use windows_sddl::{parse, rights, AccessMask};
 
 let sd = parse(&nt_security_descriptor_bytes)?;
+// DCSync requires BOTH REPL_GET_CHANGES *and* REPL_GET_CHANGES_ALL on the same
+// trustee — and only on the domain head. `is_dcsync_right` returns true for
+// either GUID, so a single match is not a conclusion. Accumulate per trustee.
+use std::collections::HashMap;
+let mut got: HashMap<&windows_sddl::Sid, u8> = HashMap::new(); // 1 = GC, 2 = GC-All
 for ace in sd.dacl.iter().flat_map(|d| &d.aces).filter(|a| a.is_allow()) {
     if ace.mask.contains(AccessMask::GENERIC_ALL) {
         println!("{} has GenericAll", ace.trustee);
     }
     if let Some(g) = &ace.object_type {
-        if rights::is_dcsync_right(g) {
-            println!("{} can DCSync", ace.trustee);
-        }
+        if rights::REPL_GET_CHANGES.matches(g)     { *got.entry(&ace.trustee).or_default() |= 1; }
+        if rights::REPL_GET_CHANGES_ALL.matches(g) { *got.entry(&ace.trustee).or_default() |= 2; }
+    }
+}
+for (trustee, bits) in got {
+    if bits == 3 {
+        println!("{trustee} has BOTH REPL_GET_CHANGES + REPL_GET_CHANGES_ALL \
+                  (DCSync-capable if this SD is the domain head)");
     }
 }
 ```
@@ -63,8 +73,10 @@ in the ecosystem's
 ## Scope
 
 Parsing + building of self-relative security descriptors, ACLs, ACEs, SIDs, and GUIDs, plus the
-AD extended-right GUID table. SACL/audit ACEs are preserved as `AceType::Other`. Conditional
-ACEs (SDDL string form) are out of scope for now.
+AD extended-right GUID table. **The SACL is not parsed today** — `SecurityDescriptor` carries
+owner + group + DACL only, and a present SACL is skipped, not preserved. Non-standard ACE
+types found inside the DACL are surfaced as `AceType::Other`. Conditional ACEs (SDDL string
+form) are out of scope for now.
 
 Despite the crate name, the implemented input is the binary self-relative
 security-descriptor format. Complete parsing of the textual SDDL language is
